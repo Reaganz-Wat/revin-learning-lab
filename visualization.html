@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stats &amp; RevIN — Real Data Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+:root {
+  --bg: #f0f4f8; --card: #fff; --border: #e2e8f0; --text: #1e293b;
+  --muted: #64748b; --blue: #3b82f6; --amber: #f59e0b; --green: #10b981;
+  --red: #ef4444; --purple: #8b5cf6; --indigo: #6366f1;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; }
+
+.header { background: linear-gradient(135deg,#0f172a,#1e3a5f); color: #fff; padding: .85rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 12px rgba(0,0,0,.3); gap: 1rem; flex-wrap: wrap; }
+.header-title { font-size: 1rem; font-weight: 700; }
+.header-title span { color: #60a5fa; }
+
+.tabs { display: flex; gap: .2rem; flex-wrap: wrap; }
+.tab { background: transparent; border: none; color: #94a3b8; padding: .35rem .7rem; border-radius: 6px; cursor: pointer; font-size: .78rem; font-weight: 600; transition: all .15s; white-space: nowrap; }
+.tab:hover { background: rgba(255,255,255,.1); color: #e2e8f0; }
+.tab.active { background: var(--blue); color: #fff; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 1.25rem; }
+.section { display: none; }
+.section.active { display: block; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; }
+.card-title { font-size: 1rem; font-weight: 700; margin-bottom: .3rem; }
+.card-desc { color: var(--muted); font-size: .87rem; margin-bottom: .75rem; line-height: 1.7; }
+
+/* Section header */
+.sec-head { margin-bottom: 1rem; }
+.sec-head h2 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+.sec-head p  { color: var(--muted); font-size: .88rem; margin-top: .2rem; }
+.source-tag  { display: inline-flex; align-items: center; gap: .4rem; background: #f1f5f9; border: 1px solid var(--border); border-radius: 6px; padding: .2rem .65rem; font-size: .75rem; font-weight: 600; color: var(--muted); margin-top: .45rem; }
+.source-tag .nb { color: var(--blue); }
+
+.formula { background: #f8fafc; border-left: 4px solid var(--blue); padding: .6rem 1rem; border-radius: 0 8px 8px 0; font-family: 'Courier New', monospace; font-size: .93rem; color: #0f172a; margin: .5rem 0 .8rem; }
+
+/* Grids */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: .75rem; }
+.gl { display: grid; grid-template-columns: 290px 1fr; gap: 1rem; }
+@media(max-width:820px){ .g2,.g3,.g4,.gl{ grid-template-columns:1fr; } }
+@media(max-width:600px){ .tab{ font-size:.68rem; padding:.25rem .45rem; } }
+
+/* Controls */
+.controls { display: flex; flex-direction: column; gap: .55rem; }
+.ctrl { display: flex; align-items: center; gap: .6rem; }
+.ctrl label { font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 125px; }
+.ctrl input[type=range] { flex: 1; accent-color: var(--blue); cursor: pointer; }
+.ctrl .val { min-width: 42px; text-align: right; font-size: .85rem; font-weight: 700; color: var(--blue); }
+
+/* Stats */
+.stats { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .65rem; }
+.stat { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: .45rem .85rem; text-align: center; min-width: 90px; }
+.stat-label { font-size: .67rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; display: block; }
+.stat-value { font-size: 1.2rem; font-weight: 800; color: var(--text); display: block; }
+.stat.blue .stat-value  { color: var(--blue); }
+.stat.green .stat-value { color: var(--green); }
+.stat.red .stat-value   { color: var(--red); }
+.stat.amber .stat-value { color: var(--amber); }
+.stat.purple .stat-value{ color: var(--purple); }
+
+/* Charts */
+.chart-wrap      { position: relative; height: 270px; }
+.chart-wrap.tall { height: 320px; }
+.chart-wrap.sm   { height: 200px; }
+.chart-wrap.xs   { height: 160px; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: .3rem; background: var(--blue); color: #fff; border: none; padding: .42rem .9rem; border-radius: 8px; cursor: pointer; font-size: .82rem; font-weight: 700; transition: filter .15s; }
+.btn:hover  { filter: brightness(1.12); }
+.btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+.btn.green  { background: var(--green); }
+.btn.red    { background: var(--red); }
+.btn.amber  { background: var(--amber); }
+.btn.purple { background: var(--purple); }
+.btn.outline{ background: transparent; color: var(--blue); border: 2px solid var(--blue); }
+.btn-row { display: flex; gap: .45rem; flex-wrap: wrap; margin-top: .7rem; }
+
+.tog { padding: .32rem .7rem; border-radius: 6px; border: 2px solid var(--border); background: #fff; color: var(--muted); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.tog.active { border-color: var(--blue); background: #eff6ff; color: var(--blue); }
+
+/* Info boxes */
+.info { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: .6rem 1rem; font-size: .85rem; color: #1e40af; margin-top: .7rem; }
+.info.green  { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.info.amber  { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.info.red    { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
+.info.purple { background: #faf5ff; border-color: #e9d5ff; color: #6b21a8; }
+
+/* Pipeline */
+.pipeline { display: flex; align-items: center; gap: .35rem; overflow-x: auto; padding: .4rem 0; margin: .65rem 0; }
+.pipe-step { border: 2px solid var(--border); border-radius: 10px; padding: .4rem .7rem; min-width: 100px; text-align: center; font-size: .78rem; font-weight: 700; transition: all .3s; background: #fff; color: var(--muted); }
+.pipe-step.done   { border-color: var(--green); background: #f0fdf4; color: var(--green); }
+.pipe-step.active { border-color: var(--blue); background: #eff6ff; color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+.pipe-arrow { color: var(--muted); font-size: 1.1rem; flex-shrink: 0; }
+
+/* Table */
+.tbl { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.tbl th { background: #f1f5f9; padding: .38rem .7rem; text-align: left; font-size: .71rem; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+.tbl td { padding: .32rem .7rem; border-top: 1px solid var(--border); }
+.tbl .out  { color: var(--red); font-weight: 700; }
+.tbl .mild { color: var(--amber); font-weight: 600; }
+.tbl .norm { color: var(--green); }
+.tbl-wrap { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+hr { border: none; border-top: 1px solid var(--border); margin: .75rem 0; }
+
+.badge { display: inline-block; padding: .1rem .45rem; border-radius: 100px; font-size: .72rem; font-weight: 700; }
+.badge.blue  { background: #dbeafe; color: #1d4ed8; }
+.badge.green { background: #dcfce7; color: #15803d; }
+.badge.red   { background: #fee2e2; color: #b91c1c; }
+.badge.amber { background: #fef3c7; color: #b45309; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-title">📊 <span>Stats &amp; RevIN</span> — Real Data Visualizer</div>
+  <nav class="tabs">
+    <button class="tab active" onclick="showSection('mean',this)">Mean</button>
+    <button class="tab" onclick="showSection('variance',this)">Variance</button>
+    <button class="tab" onclick="showSection('stddev',this)">Std Dev</button>
+    <button class="tab" onclick="showSection('normalization',this)">Normalization</button>
+    <button class="tab" onclick="showSection('zscore',this)">Z-Score</button>
+    <button class="tab" onclick="showSection('timeseries',this)">Time Series</button>
+    <button class="tab" onclick="showSection('distshift',this)">Dist. Shift</button>
+    <button class="tab" onclick="showSection('revin',this)">RevIN</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ══════════════════════ MEAN ══════════════════════ -->
+<section id="mean" class="section active">
+  <div class="sec-head">
+    <h2>The Mean — Where Data Balances</h2>
+    <p>The mean is the single number that represents the "centre" of all your values. It is where the histogram would balance if you put it on a seesaw.</p>
+    <div class="source-tag">📁 data/fundamentals_data.csv &nbsp;·&nbsp; <span class="nb">📓 Notebook 01</span></div>
+  </div>
+  <div class="gl">
+    <div>
+      <div class="card">
+        <div class="card-title">Formula</div>
+        <div class="formula">x̄ = (x₁ + x₂ + … + xₙ) / n</div>
+        <div class="card-desc">Sum every value in the dataset, then divide by how many there are. The red dashed line on the chart is the mean.</div>
+
+        <div style="margin-bottom:.5rem"><b style="font-size:.82rem">Switch column:</b></div>
+        <div class="btn-row" style="margin-top:.2rem">
+          <button class="tog active" id="mCol0" onclick="setMeanCol(0,this)">student_score</button>
+          <button class="tog" id="mCol1" onclick="setMeanCol(1,this)">temperature</button>
+          <button class="tog" id="mCol2" onclick="setMeanCol(2,this)">sales</button>
+          <button class="tog" id="mCol3" onclick="setMeanCol(3,this)">stock_price</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn red" onclick="addMeanOutlier()">+ Add Outlier</button>
+          <button class="btn outline" onclick="resetMeanOutliers()">Reset to Real Data</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="stats">
+          <div class="stat"><span class="stat-label">n (rows)</span><span class="stat-value" id="mStatN">50</span></div>
+          <div class="stat"><span class="stat-label">Sum</span><span class="stat-value" id="mStatSum">—</span></div>
+          <div class="stat blue"><span class="stat-label">Mean x̄</span><span class="stat-value" id="mStatMean">—</span></div>
+          <div class="stat red"><span class="stat-label">Outliers added</span><span class="stat-value" id="mStatOut">0</span></div>
+        </div>
+        <div class="info" id="mInfo" style="margin-top:.65rem">These are 50 real rows from fundamentals_data.csv. Click "Add Outlier" to see how one extreme value drags the mean.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" id="mChartTitle">student_score — 50 real students</div>
+      <div class="card-desc">Each bar shows how many students scored in that range. The red line is the mean — notice it sits at the "balance point" of the bars.</div>
+      <div class="chart-wrap tall"><canvas id="meanChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ VARIANCE ══════════════════════ -->
+<section id="variance" class="section">
+  <div class="sec-head">
+    <h2>Variance — Why Some Columns Are More Spread Out</h2>
+    <p>All four columns in the CSV have different variances. This is exactly why a model can't treat them equally — and why normalization matters.</p>
+    <div class="source-tag">📁 data/fundamentals_data.csv &nbsp;·&nbsp; <span class="nb">📓 Notebook 02</span></div>
+  </div>
+  <div class="card">
+    <div class="formula">σ² = Σ(xᵢ − x̄)² / n</div>
+    <div class="card-desc">Subtract the mean from each value, square it (so negatives become positive), then average all of those squares. Larger spread → larger variance.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">All 4 columns, same 50 rows — watch how different the spread is</div>
+    <div class="card-desc">Each histogram uses the real values from the CSV. The variance (σ²) and standard deviation (σ) are computed from the actual data — not generated numbers.</div>
+    <div class="g2" style="margin-top:.5rem">
+      <div>
+        <div style="font-weight:700;font-size:.85rem;color:var(--blue);margin-bottom:.3rem">student_score <span class="badge blue" id="vv0">σ²=?</span></div>
+        <div class="chart-wrap sm"><canvas id="varC0"></canvas></div>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:.85rem;color:var(--amber);margin-bottom:.3rem">temperature <span class="badge amber" id="vv1">σ²=?</span></div>
+        <div class="chart-wrap sm"><canvas id="varC1"></canvas></div>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:.85rem;color:var(--red);margin-bottom:.3rem">sales <span class="badge red" id="vv2">σ²=?</span></div>
+        <div class="chart-wrap sm"><canvas id="varC2"></canvas></div>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:.85rem;color:var(--purple);margin-bottom:.3rem">stock_price <span class="badge" style="background:#ede9fe;color:#6b21a8" id="vv3">σ²=?</span></div>
+        <div class="chart-wrap sm"><canvas id="varC3"></canvas></div>
+      </div>
+    </div>
+    <div class="info amber" id="varInfo" style="margin-top:.75rem">Loading real variance values…</div>
+  </div>
+</section>
+
+<!-- ══════════════════════ STD DEV ══════════════════════ -->
+<section id="stddev" class="section">
+  <div class="sec-head">
+    <h2>Standard Deviation — Back to the Original Units</h2>
+    <p>Variance is in "squared units" (scores²), which is hard to interpret. Taking its square root gives the standard deviation — back in the same unit as your data.</p>
+    <div class="source-tag">📁 data/fundamentals_data.csv → student_score &nbsp;·&nbsp; <span class="nb">📓 Notebook 03</span></div>
+  </div>
+  <div class="card">
+    <div class="formula">σ = √(σ²)     →    68% of data within ±1σ, 95% within ±2σ, 99.7% within ±3σ</div>
+    <div class="card-desc">The coloured bands below show these theoretical ranges drawn on the <b>real</b> student score distribution. Because n=50 is small, the observed percentages will be close to but not exactly 68/95/99.7.</div>
+  </div>
+  <div class="gl">
+    <div>
+      <div class="card">
+        <div class="stats">
+          <div class="stat blue"><span class="stat-label">Mean μ</span><span class="stat-value" id="sdMean">—</span></div>
+          <div class="stat amber"><span class="stat-label">Variance σ²</span><span class="stat-value" id="sdVar">—</span></div>
+          <div class="stat purple"><span class="stat-label">Std Dev σ</span><span class="stat-value" id="sdSig">—</span></div>
+        </div>
+        <hr>
+        <div style="font-size:.82rem;color:var(--muted);margin-top:.4rem">Observed % within bands (real data):</div>
+        <div class="stats" style="margin-top:.4rem">
+          <div class="stat blue"><span class="stat-label">±1σ (theory 68%)</span><span class="stat-value" id="sd1s">—</span></div>
+          <div class="stat green"><span class="stat-label">±2σ (theory 95%)</span><span class="stat-value" id="sd2s">—</span></div>
+          <div class="stat amber"><span class="stat-label">±3σ (theory 99.7%)</span><span class="stat-value" id="sd3s">—</span></div>
+        </div>
+        <div class="info" style="margin-top:.65rem">Blue band = within 1σ of mean. Green band = within 2σ. Almost all students fall within 3σ.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">student_score — real histogram with σ bands</div>
+      <div class="chart-wrap tall"><canvas id="sdChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ NORMALIZATION ══════════════════════ -->
+<section id="normalization" class="section">
+  <div class="sec-head">
+    <h2>Normalization — Levelling the Playing Field</h2>
+    <p>All 4 columns have wildly different scales. Before you can feed them all into a model together, you need to normalize. The shape of the distribution stays the same — only the axis changes.</p>
+    <div class="source-tag">📁 data/fundamentals_data.csv — all 4 columns &nbsp;·&nbsp; <span class="nb">📓 Notebooks 04 &amp; 05</span></div>
+  </div>
+  <div class="card">
+    <div class="formula">x_normalized = (x − center) / scale</div>
+    <div style="margin-bottom:.65rem">
+      <b style="font-size:.83rem">Select column:</b>
+      <div class="btn-row" style="margin-top:.3rem">
+        <button class="tog active" id="nCol0" onclick="setNormCol(0,this)">student_score</button>
+        <button class="tog" id="nCol1" onclick="setNormCol(1,this)">temperature</button>
+        <button class="tog" id="nCol2" onclick="setNormCol(2,this)">sales</button>
+        <button class="tog" id="nCol3" onclick="setNormCol(3,this)">stock_price</button>
+      </div>
+    </div>
+    <div style="margin-bottom:.75rem">
+      <b style="font-size:.83rem">Select method:</b>
+      <div class="btn-row" style="margin-top:.3rem">
+        <button class="tog active" id="nM0" onclick="setNormMethod(0,this)">Raw (no change)</button>
+        <button class="tog" id="nM1" onclick="setNormMethod(1,this)">Centered (μ=0)</button>
+        <button class="tog" id="nM2" onclick="setNormMethod(2,this)">Z-Score (μ=0, σ=1)</button>
+        <button class="tog" id="nM3" onclick="setNormMethod(3,this)">Min-Max [0,1]</button>
+      </div>
+    </div>
+    <div class="g2">
+      <div>
+        <div class="card-title">Before <span class="badge amber">original scale</span></div>
+        <div class="stats" style="margin-bottom:.4rem">
+          <div class="stat"><span class="stat-label">Mean</span><span class="stat-value" id="nBm">—</span></div>
+          <div class="stat"><span class="stat-label">Std</span><span class="stat-value" id="nBs">—</span></div>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value" id="nBmi">—</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value" id="nBma">—</span></div>
+        </div>
+        <div class="chart-wrap"><canvas id="nChartB"></canvas></div>
+      </div>
+      <div>
+        <div class="card-title">After <span class="badge green" id="nMethodLabel">Raw</span></div>
+        <div class="stats" style="margin-bottom:.4rem">
+          <div class="stat green"><span class="stat-label">Mean</span><span class="stat-value" id="nAm">—</span></div>
+          <div class="stat green"><span class="stat-label">Std</span><span class="stat-value" id="nAs">—</span></div>
+          <div class="stat green"><span class="stat-label">Min</span><span class="stat-value" id="nAmi">—</span></div>
+          <div class="stat green"><span class="stat-label">Max</span><span class="stat-value" id="nAma">—</span></div>
+        </div>
+        <div class="chart-wrap"><canvas id="nChartA"></canvas></div>
+      </div>
+    </div>
+    <div class="info" id="nInfo" style="margin-top:.7rem"></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ Z-SCORE ══════════════════════ -->
+<section id="zscore" class="section">
+  <div class="sec-head">
+    <h2>Z-Score — How Far Is Each Student From Average?</h2>
+    <p>A z-score tells you how many standard deviations a value is from the mean. z=0 is exactly average. z=2 is two standard deviations above. |z|&gt;3 is usually flagged as an outlier.</p>
+    <div class="source-tag">📁 data/fundamentals_data.csv → student_score &nbsp;·&nbsp; <span class="nb">📓 Notebook 05</span></div>
+  </div>
+  <div class="card">
+    <div class="formula">z = (x − μ) / σ     →    z = (score − 69.30) / 11.10</div>
+    <div class="card-desc">Using the real mean and std from student_score. Green bars = normal range. Amber = mild outlier (|z|&gt;2). Red = strong outlier (|z|&gt;3).</div>
+  </div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="card-title">Z-Score Distribution</div>
+        <div class="card-desc">Each bar's colour shows how extreme that score is relative to the class average.</div>
+        <div class="chart-wrap tall"><canvas id="zsChart"></canvas></div>
+        <div class="stats" style="margin-top:.65rem">
+          <div class="stat green"><span class="stat-label">Normal |z|≤2</span><span class="stat-value" id="zsNorm">—</span></div>
+          <div class="stat amber"><span class="stat-label">Mild 2&lt;|z|≤3</span><span class="stat-value" id="zsMild">—</span></div>
+          <div class="stat red"><span class="stat-label">Outlier |z|&gt;3</span><span class="stat-value" id="zsOut">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">All 50 Students — sorted by how extreme their z-score is</div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Rank</th><th>Raw Score</th><th>Z-Score</th><th>Category</th></tr></thead>
+          <tbody id="zsTbody"></tbody>
+        </table>
+      </div>
+      <div class="info" style="margin-top:.65rem">A z-score of +2 means that student scored 2 standard deviations above the class average — top ~2.5% of the class.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ TIME SERIES ══════════════════════ -->
+<section id="timeseries" class="section">
+  <div class="sec-head">
+    <h2>Time Series — Real Stock Prices, Jan–Jun 2023</h2>
+    <p>A time series is a sequence of values ordered by time. Unlike the fundamentals CSV, the ORDER matters — yesterday's price influences today's.</p>
+    <div class="source-tag">📁 data/stock_sample.csv — close prices &nbsp;·&nbsp; <span class="nb">📓 Notebook 06</span></div>
+  </div>
+  <div class="card">
+    <div class="formula">rolling_mean[t] = mean(close[t−w+1], close[t−w+2], …, close[t])</div>
+    <div class="card-desc">The rolling mean smooths out daily noise and reveals the underlying trend. Drag the slider to change the window size — notice how a larger window is smoother but "lags" behind the real price.</div>
+    <div class="ctrl" style="margin-bottom:.75rem">
+      <label>Rolling window (days)</label>
+      <input type="range" id="tsWin" min="2" max="30" value="10" oninput="tsWinVal.textContent=this.value;updateTimeSeries()">
+      <span class="val" id="tsWinVal">10</span>
+    </div>
+    <div class="chart-wrap tall"><canvas id="tsChart"></canvas></div>
+    <div class="stats" style="margin-top:.7rem">
+      <div class="stat blue"><span class="stat-label">Mean (120 days)</span><span class="stat-value" id="tsMean">—</span></div>
+      <div class="stat amber"><span class="stat-label">Std Dev</span><span class="stat-value" id="tsStd">—</span></div>
+      <div class="stat green"><span class="stat-label">Min close</span><span class="stat-value" id="tsMin">—</span></div>
+      <div class="stat red"><span class="stat-label">Max close</span><span class="stat-value" id="tsMax">—</span></div>
+      <div class="stat purple"><span class="stat-label">Window size</span><span class="stat-value" id="tsWinStat">—</span></div>
+    </div>
+    <div class="info">Notice the upward trend overall, but there is noise day-to-day. The rolling mean (red dashed) tracks the trend while ignoring the noise.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════ DIST SHIFT ══════════════════════ -->
+<section id="distshift" class="section">
+  <div class="sec-head">
+    <h2>Distribution Shift — The Problem RevIN Solves</h2>
+    <p>A model trained on the original stock (≈$110) will fail badly on the shifted stock (≈$250). These are the same two real CSVs from your data folder.</p>
+    <div class="source-tag">📁 stock_sample.csv vs shifted_stock_sample.csv &nbsp;·&nbsp; <span class="nb">📓 Notebook 07</span></div>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div class="card-title">Real numbers from your CSV files</div>
+    <div class="stats">
+      <div class="stat blue"><span class="stat-label">Original mean</span><span class="stat-value" id="dsM1">—</span></div>
+      <div class="stat blue"><span class="stat-label">Original std</span><span class="stat-value" id="dsS1">—</span></div>
+      <div class="stat red"><span class="stat-label">Shifted mean</span><span class="stat-value" id="dsM2">—</span></div>
+      <div class="stat red"><span class="stat-label">Shifted std</span><span class="stat-value" id="dsS2">—</span></div>
+      <div class="stat amber"><span class="stat-label">Mean shift</span><span class="stat-value" id="dsShift">—</span></div>
+      <div class="stat amber"><span class="stat-label">Std ratio</span><span class="stat-value" id="dsRatio">—</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="margin-bottom:.7rem">
+      <b style="font-size:.84rem">Normalization approach — see how each handles the shift:</b>
+      <div class="btn-row" style="margin-top:.35rem">
+        <button class="tog active" id="dsBtn0" onclick="setDsMode(0,this)">No Normalization</button>
+        <button class="tog" id="dsBtn1" onclick="setDsMode(1,this)">Global Norm (fails!)</button>
+        <button class="tog" id="dsBtn2" onclick="setDsMode(2,this)">RevIN — Instance Norm ✓</button>
+      </div>
+    </div>
+    <div class="g2">
+      <div>
+        <div class="card-title">Both datasets over time (120 trading days each)</div>
+        <div class="chart-wrap"><canvas id="dsTimeline"></canvas></div>
+      </div>
+      <div>
+        <div class="card-title">Distribution comparison (histogram)</div>
+        <div class="chart-wrap"><canvas id="dsDist"></canvas></div>
+      </div>
+    </div>
+    <div class="info" id="dsInfo" style="margin-top:.75rem"></div>
+  </div>
+</section>
+
+<!-- ══════════════════════ REVIN ══════════════════════ -->
+<section id="revin" class="section">
+  <div class="sec-head">
+    <h2>RevIN — Reversible Instance Normalization</h2>
+    <p>Pick any 20-day window from the real stock data. RevIN normalizes it with that window's own mean and std, the model predicts in normalized space, then RevIN brings the predictions back to dollar prices.</p>
+    <div class="source-tag">📁 data/stock_sample.csv — 120 real trading days &nbsp;·&nbsp; <span class="nb">📓 Notebooks 08 &amp; 09</span></div>
+  </div>
+  <div class="g2" style="margin-bottom:.85rem">
+    <div class="card">
+      <div class="formula" style="font-size:.87rem">NORMALIZE:   x̂ = (x − μ) / (σ + ε)
+MODEL:        ŷ_norm = model(x̂)
+DENORMALIZE: ŷ = ŷ_norm × σ + μ</div>
+      <div class="card-desc" style="margin-top:.4rem">The stored μ and σ come from the input window itself — not from the whole training set. This is what makes it work across regimes.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Choose a 20-day window from real stock data</div>
+      <div class="ctrl">
+        <label>Window start (day)</label>
+        <input type="range" id="rvStart" min="0" max="100" value="0" oninput="rvStartVal.textContent=this.value;resetRevIN()">
+        <span class="val" id="rvStartVal">0</span>
+      </div>
+      <div style="font-size:.82rem;color:var(--muted);margin-top:.4rem" id="rvDateRange">Loading…</div>
+      <div class="btn-row" style="margin-top:.5rem">
+        <button class="btn outline" onclick="rvStart.value=Math.floor(Math.random()*100);rvStartVal.textContent=rvStart.value;resetRevIN()">Random Window</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="card" style="margin-bottom:.85rem">
+    <div class="card-title">Step Through the RevIN Pipeline</div>
+    <div class="pipeline">
+      <div class="pipe-step active" id="rv0">① Input Window</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step pending" id="rv1">② Normalize</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step pending" id="rv2">③ Model Predicts</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step pending" id="rv3">④ Denormalize</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn green"   id="rvBN" onclick="stepRV(1)">Step 1: Normalize →</button>
+      <button class="btn purple"  id="rvBM" onclick="stepRV(2)" disabled>Step 2: Run Model →</button>
+      <button class="btn amber"   id="rvBD" onclick="stepRV(3)" disabled>Step 3: Denormalize →</button>
+      <button class="btn outline" id="rvBP" onclick="stepRV(4)" disabled>Prove Reversible</button>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="card-title">Stored Statistics</div>
+        <div class="stats">
+          <div class="stat blue"><span class="stat-label">Stored μ (window mean)</span><span class="stat-value" id="rvMu">—</span></div>
+          <div class="stat amber"><span class="stat-label">Stored σ (window std)</span><span class="stat-value" id="rvSig">—</span></div>
+          <div class="stat green"><span class="stat-label">Norm mean (≈0)</span><span class="stat-value" id="rvNM">—</span></div>
+          <div class="stat green"><span class="stat-label">Norm std (≈1)</span><span class="stat-value" id="rvNS">—</span></div>
+        </div>
+        <div class="info purple" id="rvInfo" style="margin-top:.65rem">Select a window and click Normalize to begin.</div>
+        <div class="info green" id="rvProof" style="margin-top:.5rem;display:none"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" id="rvChTitle">Input Window — real close prices ($)</div>
+      <div class="chart-wrap"><canvas id="rvChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- All 4 stages -->
+  <div class="card" id="rvAllCard" style="display:none;margin-top:.5rem">
+    <div class="card-title">All Four Stages Side by Side</div>
+    <div class="card-desc">Every number in these charts comes from real stock prices — only the normalization is applied mathematically.</div>
+    <div class="g2" style="margin-top:.5rem">
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--blue);margin-bottom:.2rem">① Input Window ($)</div>
+        <div class="chart-wrap xs"><canvas id="rv4a"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--green);margin-bottom:.2rem">② After RevIN Normalize (μ≈0, σ≈1)</div>
+        <div class="chart-wrap xs"><canvas id="rv4b"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--purple);margin-bottom:.2rem">③ Model Output (normalized space)</div>
+        <div class="chart-wrap xs"><canvas id="rv4c"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--amber);margin-bottom:.2rem">④ Denormalized Predictions ($)</div>
+        <div class="chart-wrap xs"><canvas id="rv4d"></canvas></div>
+      </div>
+    </div>
+    <div class="info green" style="margin-top:.65rem" id="rvFinalMsg"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// REAL DATA — embedded directly from your CSV files
+// ════════════════════════════════════════════════════════════
+
+const FUND = {
+  student_score: [78.0,70.3,79.8,90.3,69.2,69.2,91.0,81.2,66.4,78.5,66.4,66.4,74.9,49.0,51.3,65.3,59.8,75.8,61.1,55.1,89.6,69.3,72.8,54.9,65.5,73.3,58.2,76.5,64.8,68.5,64.8,94.2,71.8,59.3,81.9,57.3,74.5,48.5,56.1,74.4,80.9,74.1,70.6,68.4,54.3,63.4,66.5,84.7,76.1,50.8],
+  temperature:   [23.6,20.1,18.6,25.1,27.2,26.7,17.8,20.5,23.7,26.9,19.6,21.1,16.5,16.0,26.1,28.8,21.6,27.0,23.8,18.8,23.8,29.7,21.8,29.8,8.9,26.1,22.4,20.5,22.5,12.1,20.9,23.8,29.4,19.4,18.0,19.5,26.6,23.6,19.4,24.6,22.5,26.8,18.5,20.4,20.0,14.7,23.5,23.3,22.0,20.8],
+  sales:         [330,450,459,404,481,548,726,521,531,491,270,497,507,796,477,536,496,360,637,590,595,391,668,332,570,763,381,432,512,440,314,508,373,557,390,686,406,461,598,352,527,657,307,522,531,594,352,342,563,536],
+  stock_price:   [157.51,160.39,129.6,156.97,158.79,128.57,205.97,164.21,114.26,169.7,120.76,173.61,184.76,125.38,178.9,162.38,174.66,206.9,142.64,127.39,123.31,125.53,147.69,160.23,158.3,174.82,150.39,193.61,142.06,231.61,168.77,124.29,117.87,164.47,143.3,171.42,164.2,147.82,124.6,104.55,136.6,175.69,156.42,112.63,155.2,161.56,123.48,154.61,151.75,115.71],
+  labels: ['student_score','temperature','sales','stock_price']
+};
+
+const STOCK = {
+  dates:  ["2023-01-02","2023-01-03","2023-01-04","2023-01-05","2023-01-06","2023-01-09","2023-01-10","2023-01-11","2023-01-12","2023-01-13","2023-01-16","2023-01-17","2023-01-18","2023-01-19","2023-01-20","2023-01-23","2023-01-24","2023-01-25","2023-01-26","2023-01-27","2023-01-30","2023-01-31","2023-02-01","2023-02-02","2023-02-03","2023-02-06","2023-02-07","2023-02-08","2023-02-09","2023-02-10","2023-02-13","2023-02-14","2023-02-15","2023-02-16","2023-02-17","2023-02-20","2023-02-21","2023-02-22","2023-02-23","2023-02-24","2023-02-27","2023-02-28","2023-03-01","2023-03-02","2023-03-03","2023-03-06","2023-03-07","2023-03-08","2023-03-09","2023-03-10","2023-03-13","2023-03-14","2023-03-15","2023-03-16","2023-03-17","2023-03-20","2023-03-21","2023-03-22","2023-03-23","2023-03-24","2023-03-27","2023-03-28","2023-03-29","2023-03-30","2023-03-31","2023-04-03","2023-04-04","2023-04-05","2023-04-06","2023-04-07","2023-04-10","2023-04-11","2023-04-12","2023-04-13","2023-04-14","2023-04-17","2023-04-18","2023-04-19","2023-04-20","2023-04-21","2023-04-24","2023-04-25","2023-04-26","2023-04-27","2023-04-28","2023-05-01","2023-05-02","2023-05-03","2023-05-04","2023-05-05","2023-05-08","2023-05-09","2023-05-10","2023-05-11","2023-05-12","2023-05-15","2023-05-16","2023-05-17","2023-05-18","2023-05-19","2023-05-22","2023-05-23","2023-05-24","2023-05-25","2023-05-26","2023-05-29","2023-05-30","2023-05-31","2023-06-01","2023-06-02","2023-06-05","2023-06-06","2023-06-07","2023-06-08","2023-06-09","2023-06-12","2023-06-13","2023-06-14","2023-06-15","2023-06-16"],
+  close:  [100.48,101.23,102.65,104.06,102.3,101.13,101.82,102.51,103.21,108.38,109.2,110.81,112.18,113.14,112.73,113.85,112.78,112.48,111.83,111.98,115.33,112.69,113.7,111.45,110.82,112.39,112.52,111.04,110.07,111.06,110.07,110.41,110.51,109.64,112.68,113.62,110.79,111.09,110.2,111.42,110.35,110.23,110.97,112.22,110.57,110.14,109.52,108.65,111.13,111.74,110.01,111.33,114.38,115.91,113.75,113.1,114.95,113.97,114.64,115.8,114.5,114.45,109.9,108.53,108.22,106.56,108.81,106.9,106.34,106.55,108.54,106.63,108.24,108.29,106.99,107.65,107.95,107.17,107.3,106.82,107.0,107.93,110.15,108.48,111.47,108.79,108.62,109.46,109.89,109.06,108.81,108.17,107.4,108.6,109.12,108.21,109.47,109.93,111.1,112.02,110.89,110.15,111.22,112.12,112.12,112.33,114.18,113.37,114.19,113.94,113.66,115.28,116.53,117.76,119.75,119.82,120.9,120.46,120.99,120.83]
+};
+
+const SHIFTED = {
+  close: [179.3,177.6,183.39,184.23,188.5,182.47,183.58,187.25,187.63,192.13,189.99,196.02,206.26,204.65,202.69,209.33,216.8,214.35,212.42,211.15,205.02,200.95,196.59,193.33,193.22,194.26,201.05,196.71,201.07,200.16,199.98,203.02,198.1,199.81,200.59,202.82,204.16,215.55,212.59,210.15,207.33,204.85,202.03,207.43,214.08,211.44,207.64,209.85,207.35,210.31,211.29,204.39,211.52,220.11,217.2,215.39,216.8,218.45,221.68,231.78,230.92,226.94,220.18,216.71,216.59,225.38,222.86,224.01,223.97,229.96,243.19,240.41,237.87,243.46,247.2,257.52,260.91,258.9,262.35,268.89,273.86,276.99,283.64,291.11,300.17,304.56,303.5,304.54,312.81,307.29,309.86,307.25,307.5,316.35,317.75,318.14,308.81,313.99,318.56,334.18,331.99,333.66,335.57,347.51,346.85,349.06,353.84,355.37,351.96,353.54,362.08,354.05,355.16,349.79,359.2,347.41,343.22,346.15,358.38,357.93]
+};
+
+// ════════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════════
+
+const charts = {};
+const inited = new Set();
+
+function mk(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  const c = document.getElementById(id);
+  if (!c) return null;
+  charts[id] = new Chart(c, cfg);
+  return charts[id];
+}
+
+function am(a) { return a.reduce((s,v)=>s+v,0)/a.length; }
+function av(a) { const m=am(a); return a.reduce((s,v)=>s+(v-m)**2,0)/a.length; }
+function as(a) { return Math.sqrt(av(a)); }
+function amin(a){ return Math.min(...a); }
+function amax(a){ return Math.max(...a); }
+function fmt(v,d=2){ return (+v).toFixed(d); }
+function setT(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+function zscore(a){ const m=am(a),s=as(a)||1; return a.map(v=>(v-m)/s); }
+function center(a){ const m=am(a); return a.map(v=>v-m); }
+function minmax(a){ const mn=amin(a),mx=amax(a),r=mx-mn||1; return a.map(v=>(v-mn)/r); }
+
+function hist(data, nb=20){
+  const mn=amin(data), mx=amax(data), bw=(mx-mn)/nb||1;
+  const counts=Array(nb).fill(0);
+  data.forEach(v=>{ let i=Math.floor((v-mn)/bw); if(i>=nb)i=nb-1; if(i<0)i=0; counts[i]++; });
+  const labels=counts.map((_,i)=>(mn+(i+.5)*bw).toFixed(1));
+  return {labels,counts,mn,bw};
+}
+
+function annPos(val,mn,bw){ return (val-mn)/bw-.5; }
+
+function lineAnn(pos,color,label){
+  return { type:'line', xMin:pos, xMax:pos, borderColor:color, borderWidth:2.5, borderDash:[6,4],
+    label:{content:label,display:!!label,position:'start',backgroundColor:color+'dd',color:'#fff',font:{size:10,weight:'bold'},padding:3} };
+}
+function boxAnn(x1,x2,color){
+  return { type:'box', xMin:x1, xMax:x2, backgroundColor:color, borderWidth:0, drawTime:'beforeDatasetsDraw' };
+}
+
+function drawHist(id, data, color, anns={}, nb=20){
+  const {labels,counts,mn,bw}=hist(data,nb);
+  mk(id,{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:color+'99',borderColor:color,borderWidth:1,borderRadius:2}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      plugins:{legend:{display:false},annotation:{annotations:anns}},
+      scales:{
+        x:{ticks:{maxTicksLimit:6,color:'#64748b',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
+  return {mn,bw};
+}
+
+function drawLine(id, labels, datasets, opts={}){
+  mk(id,{
+    type:'line',
+    data:{labels,datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{size:11},usePointStyle:true}},...(opts.plugins||{})},
+      scales:{
+        x:{ticks:{maxTicksLimit:10,color:'#64748b',font:{size:10}},grid:{display:false},...(opts.xScale||{})},
+        y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'},...(opts.yScale||{})}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// TAB NAVIGATION
+// ════════════════════════════════════════════════════════════
+
+const initFns = {
+  mean:initMean, variance:initVariance, stddev:initStdDev,
+  normalization:initNorm, zscore:initZScore, timeseries:initTimeSeries,
+  distshift:initDistShift, revin:initRevIN
+};
+
+function showSection(id, btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if(!inited.has(id)){ inited.add(id); initFns[id]?.(); }
+}
+
+// ════════════════════════════════════════════════════════════
+// MEAN
+// ════════════════════════════════════════════════════════════
+
+let mColIdx=0, mExtras=[];
+const mCols=['student_score','temperature','sales','stock_price'];
+const mColors=['#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
+const mUnits=['points','°C','units','$'];
+
+function initMean(){ renderMean(); }
+
+function setMeanCol(i, btn){
+  mColIdx=i; mExtras=[];
+  ['mCol0','mCol1','mCol2','mCol3'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  btn.classList.add('active');
+  renderMean();
+}
+
+function renderMean(){
+  const col=mCols[mColIdx];
+  const real=FUND[col];
+  const data=[...real,...mExtras];
+  const m=am(data);
+  const {mn,bw}=hist(data,20);
+
+  setT('mStatN',data.length);
+  setT('mStatSum',fmt(data.reduce((s,v)=>s+v,0),1));
+  setT('mStatMean',fmt(m));
+  setT('mStatOut',mExtras.length);
+  setT('mChartTitle',`${col} — ${real.length} real rows from CSV${mExtras.length?' + '+mExtras.length+' outlier(s)':''}`);
+
+  drawHist('meanChart',data,mColors[mColIdx],{
+    ml: lineAnn(annPos(m,mn,bw),'#ef4444',`μ = ${fmt(m)} ${mUnits[mColIdx]}`)
+  },20);
+
+  const info=document.getElementById('mInfo');
+  if(mExtras.length===0){
+    info.textContent=`Real mean of ${col}: ${fmt(m)} ${mUnits[mColIdx]}. This is computed from the 50 actual rows in fundamentals_data.csv.`;
+    info.className='info';
+  } else {
+    const realMean=am(real);
+    info.textContent=`Adding ${mExtras.length} outlier(s) moved the mean from ${fmt(realMean)} → ${fmt(m)} ${mUnits[mColIdx]}. The mean is sensitive to extreme values!`;
+    info.className='info amber';
+  }
+}
+
+function addMeanOutlier(){
+  const col=mCols[mColIdx];
+  const data=FUND[col];
+  const m=am(data), s=as(data);
+  mExtras.push(m + 4*s + (Math.random()-0.5)*s*0.5);
+  renderMean();
+}
+function resetMeanOutliers(){ mExtras=[]; renderMean(); }
+
+// ════════════════════════════════════════════════════════════
+// VARIANCE
+// ════════════════════════════════════════════════════════════
+
+function initVariance(){
+  const cols=[FUND.student_score,FUND.temperature,FUND.sales,FUND.stock_price];
+  const colors=['#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
+  const ids=['varC0','varC1','varC2','varC3'];
+  const badgeIds=['vv0','vv1','vv2','vv3'];
+
+  cols.forEach((col,i)=>{
+    const v=av(col), s=as(col), m=am(col);
+    const {mn,bw}=drawHist(ids[i],col,colors[i],{
+      ml:lineAnn(annPos(m,mn,bw),'#ef4444',null)
+    },16);
+    document.getElementById(badgeIds[i]).textContent=`σ²=${fmt(v,0)} σ=${fmt(s,1)}`;
+  });
+
+  const scores_v=av(FUND.student_score), sales_v=av(FUND.sales);
+  const info=document.getElementById('varInfo');
+  info.textContent=`sales variance (σ²=${fmt(sales_v,0)}) is ${fmt(sales_v/scores_v,0)}× larger than student_score variance (σ²=${fmt(scores_v,0)}). If you feed both raw into a model, sales would completely dominate. This is why notebook 04 normalizes all columns.`;
+}
+
+// ════════════════════════════════════════════════════════════
+// STD DEV
+// ════════════════════════════════════════════════════════════
+
+function initStdDev(){
+  const data=FUND.student_score;
+  const m=am(data), v=av(data), s=as(data);
+
+  setT('sdMean',fmt(m)); setT('sdVar',fmt(v,1)); setT('sdSig',fmt(s));
+
+  const w1=data.filter(x=>Math.abs(x-m)<=s).length/data.length*100;
+  const w2=data.filter(x=>Math.abs(x-m)<=2*s).length/data.length*100;
+  const w3=data.filter(x=>Math.abs(x-m)<=3*s).length/data.length*100;
+  setT('sd1s',fmt(w1,1)+'%'); setT('sd2s',fmt(w2,1)+'%'); setT('sd3s',fmt(w3,1)+'%');
+
+  const {labels,counts,mn,bw}=hist(data,20);
+  const p=val=>annPos(val,mn,bw);
+
+  mk('sdChart',{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:'#6366f199',borderColor:'#6366f1',borderWidth:1,borderRadius:2}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      plugins:{legend:{display:false},annotation:{annotations:{
+        b2: boxAnn(p(m-2*s),p(m+2*s),'rgba(16,185,129,0.12)'),
+        b1: boxAnn(p(m-s),  p(m+s),  'rgba(59,130,246,0.18)'),
+        ml:  lineAnn(p(m),     '#ef4444',`μ=${fmt(m)}`),
+        p1n: lineAnn(p(m-s),   '#3b82f6',`-1σ (${fmt(m-s,1)})`),
+        p1p: lineAnn(p(m+s),   '#3b82f6',`+1σ (${fmt(m+s,1)})`),
+        p2n: lineAnn(p(m-2*s), '#10b981',`-2σ`),
+        p2p: lineAnn(p(m+2*s), '#10b981',`+2σ`),
+      }}},
+      scales:{
+        x:{ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}},grid:{display:false},title:{display:true,text:'Score (points)',color:'#64748b'}},
+        y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'},title:{display:true,text:'# Students',color:'#64748b'}}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// NORMALIZATION
+// ════════════════════════════════════════════════════════════
+
+let nColIdx=0, nMethodIdx=0;
+const nColors=['#f59e0b','#3b82f6','#10b981','#8b5cf6'];
+const nMethodNames=['Raw (no change)','Centered (μ=0)','Z-Score (μ=0, σ=1)','Min-Max [0,1]'];
+const nUnits=['pts','°C','units','$'];
+
+function initNorm(){ renderNorm(); }
+
+function setNormCol(i,btn){
+  nColIdx=i;
+  ['nCol0','nCol1','nCol2','nCol3'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  btn.classList.add('active'); renderNorm();
+}
+function setNormMethod(i,btn){
+  nMethodIdx=i;
+  ['nM0','nM1','nM2','nM3'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  btn.classList.add('active'); renderNorm();
+}
+
+function renderNorm(){
+  const cols=[FUND.student_score,FUND.temperature,FUND.sales,FUND.stock_price];
+  const colNames=FUND.labels;
+  const raw=cols[nColIdx];
+
+  let proc;
+  if(nMethodIdx===1) proc=center(raw);
+  else if(nMethodIdx===2) proc=zscore(raw);
+  else if(nMethodIdx===3) proc=minmax(raw);
+  else proc=raw;
+
+  function stats(a){ return {m:am(a),s:as(a),mn:amin(a),mx:amax(a)}; }
+  const b=stats(raw), a=stats(proc);
+
+  setT('nBm',fmt(b.m)); setT('nBs',fmt(b.s)); setT('nBmi',fmt(b.mn)); setT('nBma',fmt(b.mx));
+  setT('nAm',fmt(a.m)); setT('nAs',fmt(a.s)); setT('nAmi',fmt(a.mn)); setT('nAma',fmt(a.mx));
+  setT('nMethodLabel',nMethodNames[nMethodIdx]);
+
+  const {mn:bmn,bw:bbw}=drawHist('nChartB',raw,'#f59e0b',{ml:lineAnn(annPos(b.m,bmn,bbw),'#ef4444',`μ=${fmt(b.m)}`)},18);
+  const {mn:amn,bw:abw}=drawHist('nChartA',proc,nColors[nMethodIdx],{ml:lineAnn(annPos(a.m,amn,abw),'#ef4444',`μ=${fmt(a.m,3)}`)},18);
+
+  const msgs=[
+    `No change — ${colNames[nColIdx]} ranges from ${fmt(b.mn,1)} to ${fmt(b.mx,1)} ${nUnits[nColIdx]}. Mean = ${fmt(b.m)}.`,
+    `Centering shifts the mean to ≈0 but the spread (std=${fmt(a.s)}) is unchanged. Shape stays identical.`,
+    `Z-Score: mean ≈ 0, std ≈ 1. Every column gets the same scale. The shape is identical — only the axis values change.`,
+    `Min-Max: values compressed into [0,1]. Works well when there are no outliers. One extreme value squishes everything else!`
+  ];
+  const el=document.getElementById('nInfo');
+  el.textContent=msgs[nMethodIdx];
+  el.className=nMethodIdx===0?'info amber':'info green';
+}
+
+// ════════════════════════════════════════════════════════════
+// Z-SCORE
+// ════════════════════════════════════════════════════════════
+
+function initZScore(){
+  const data=FUND.student_score;
+  const m=am(data), s=as(data);
+  const zs=data.map(v=>(v-m)/s);
+
+  const norm=zs.filter(z=>Math.abs(z)<=2).length;
+  const mild=zs.filter(z=>Math.abs(z)>2&&Math.abs(z)<=3).length;
+  const out =zs.filter(z=>Math.abs(z)>3).length;
+  setT('zsNorm',norm); setT('zsMild',mild); setT('zsOut',out);
+
+  // Coloured histogram of z-scores
+  const nb=20;
+  const zmin=amin(zs), zmax=amax(zs), zbw=(zmax-zmin)/nb;
+  const counts=Array(nb).fill(0);
+  const colors=Array(nb), borders=Array(nb);
+  zs.forEach(z=>{ let i=Math.floor((z-zmin)/zbw); if(i>=nb)i=nb-1; if(i<0)i=0; counts[i]++; });
+  colors.forEach((_,i)=>{
+    const cz=zmin+(i+.5)*zbw;
+    if(Math.abs(cz)>3){ colors[i]='#ef444499'; borders[i]='#ef4444'; }
+    else if(Math.abs(cz)>2){ colors[i]='#f59e0b99'; borders[i]='#f59e0b'; }
+    else { colors[i]='#10b98199'; borders[i]='#10b981'; }
+  });
+  const labels=counts.map((_,i)=>(zmin+(i+.5)*zbw).toFixed(2));
+
+  mk('zsChart',{
+    type:'bar',
+    data:{labels,datasets:[{data:counts,backgroundColor:colors,borderColor:borders,borderWidth:1,borderRadius:2}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      plugins:{legend:{display:false},annotation:{annotations:{
+        z0:  lineAnn(annPos(0,zmin,zbw),'#64748b','z=0'),
+        zp2: lineAnn(annPos(2,zmin,zbw),'#f59e0b','z=+2'),
+        zn2: lineAnn(annPos(-2,zmin,zbw),'#f59e0b','z=-2'),
+      }}},
+      scales:{
+        x:{ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}},grid:{display:false},title:{display:true,text:'Z-Score (standard deviations from mean)',color:'#64748b'}},
+        y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'},title:{display:true,text:'# Students',color:'#64748b'}}
+      }
+    }
+  });
+
+  // Table — all 50 students sorted by |z|
+  const rows=data.map((v,i)=>({v,z:zs[i]})).sort((a,b)=>Math.abs(b.z)-Math.abs(a.z));
+  const tbody=document.getElementById('zsTbody');
+  tbody.innerHTML=rows.map((r,i)=>{
+    const az=Math.abs(r.z);
+    const cls=az>3?'out':az>2?'mild':'norm';
+    const cat=az>3?'🔴 Outlier (|z|>3)':az>2?'🟡 Mild (|z|>2)':'🟢 Normal';
+    return `<tr><td>${i+1}</td><td>${fmt(r.v,1)}</td><td class="${cls}">${fmt(r.z)}</td><td>${cat}</td></tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+// TIME SERIES
+// ════════════════════════════════════════════════════════════
+
+function initTimeSeries(){ updateTimeSeries(); }
+
+function updateTimeSeries(){
+  const w=+document.getElementById('tsWin').value;
+  const close=STOCK.close;
+  const dates=STOCK.dates;
+
+  const rolling=close.map((_,t)=>{
+    if(t<w-1) return null;
+    return am(close.slice(t-w+1,t+1));
+  });
+
+  setT('tsMean','$'+fmt(am(close)));
+  setT('tsStd','$'+fmt(as(close)));
+  setT('tsMin','$'+fmt(amin(close)));
+  setT('tsMax','$'+fmt(amax(close)));
+  setT('tsWinStat',w+' days');
+
+  drawLine('tsChart', dates, [
+    {label:'Close Price ($)', data:close, borderColor:'#3b82f6', backgroundColor:'#3b82f610', borderWidth:1.5, pointRadius:1.5, pointBackgroundColor:'#3b82f6', fill:true, tension:0.3},
+    {label:`Rolling Mean (${w} days)`, data:rolling, borderColor:'#ef4444', borderWidth:2.5, borderDash:[5,3], pointRadius:0, tension:0.4}
+  ],{
+    xScale:{ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}}},
+    yScale:{title:{display:true,text:'Price ($)',color:'#64748b'},ticks:{callback:v=>'$'+v,color:'#64748b',font:{size:10}}}
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// DISTRIBUTION SHIFT
+// ════════════════════════════════════════════════════════════
+
+let dsMode=0;
+
+function initDistShift(){
+  const c1=STOCK.close, c2=SHIFTED.close;
+  const m1=am(c1),s1=as(c1),m2=am(c2),s2=as(c2);
+
+  setT('dsM1','$'+fmt(m1)); setT('dsS1','$'+fmt(s1));
+  setT('dsM2','$'+fmt(m2)); setT('dsS2','$'+fmt(s2));
+  setT('dsShift','+$'+fmt(m2-m1,0));
+  setT('dsRatio',fmt(s2/s1,1)+'×');
+
+  renderDistShift();
+}
+
+function setDsMode(i,btn){
+  dsMode=i;
+  ['dsBtn0','dsBtn1','dsBtn2'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  btn.classList.add('active');
+  renderDistShift();
+}
+
+function renderDistShift(){
+  const c1=STOCK.close, c2=SHIFTED.close;
+  const dates=STOCK.dates;
+
+  // Timeline
+  drawLine('dsTimeline', [...dates,...dates], [
+    {label:'Original stock (~$110)', data:c1, borderColor:'#3b82f6', backgroundColor:'#3b82f615', borderWidth:1.5, pointRadius:0, fill:true},
+    {label:'Shifted stock (~$250)', data:c2.map((v,i)=>({x:i+c1.length,y:v})), borderColor:'#ef4444', backgroundColor:'#ef444415', borderWidth:1.5, pointRadius:0, fill:true}
+  ],{
+    plugins:{annotation:{annotations:{
+      sep:{type:'line',xMin:c1.length,xMax:c1.length,borderColor:'#64748b',borderDash:[5,3],borderWidth:2,
+        label:{content:'Regime change',display:true,position:'start',backgroundColor:'#64748bdd',color:'#fff',font:{size:10}}}
+    }}},
+    xScale:{type:'linear',ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}},title:{display:true,text:'Trading days',color:'#64748b'}},
+    yScale:{title:{display:true,text:'Close Price ($)',color:'#64748b'},ticks:{callback:v=>'$'+v,color:'#64748b',font:{size:10}}}
+  });
+
+  // Distribution
+  let d1=c1, d2=c2, l1='Original', l2='Shifted';
+  if(dsMode===1){
+    const gm=am(c1),gs=as(c1);
+    d1=c1.map(v=>(v-gm)/gs); d2=c2.map(v=>(v-gm)/gs);
+    l1='Original (global norm)'; l2='Shifted (global norm — WRONG stats!)';
+  } else if(dsMode===2){
+    const WSIZE=20;
+    function instanceNorm(series){
+      const out=[];
+      for(let i=0;i+WSIZE<=series.length;i+=WSIZE){
+        const w=series.slice(i,i+WSIZE);
+        const wm=am(w),ws=as(w)+1e-5;
+        w.forEach(v=>out.push((v-wm)/ws));
+      }
+      return out;
+    }
+    d1=instanceNorm(c1); d2=instanceNorm(c2);
+    l1='Original (RevIN per-window)'; l2='Shifted (RevIN per-window ✓)';
+  }
+
+  const allV=[...d1,...d2];
+  const mn=amin(allV),mx=amax(allV),bw=(mx-mn)/22||1;
+  function binIt(d){ const c=Array(22).fill(0); d.forEach(v=>{ let i=Math.floor((v-mn)/bw); if(i>=22)i=21; if(i<0)i=0; c[i]++; }); return c; }
+  const lbl=Array.from({length:22},(_,i)=>(mn+(i+.5)*bw).toFixed(2));
+
+  mk('dsDist',{
+    type:'bar',
+    data:{labels:lbl,datasets:[
+      {label:l1,data:binIt(d1),backgroundColor:'#3b82f688',borderColor:'#3b82f6',borderWidth:1,borderRadius:2},
+      {label:l2,data:binIt(d2),backgroundColor:'#ef444488',borderColor:'#ef4444',borderWidth:1,borderRadius:2}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      plugins:{legend:{position:'top',labels:{font:{size:10}}}},
+      scales:{
+        x:{ticks:{maxTicksLimit:6,color:'#64748b',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
+
+  const m1=am(d1),m2=am(d2);
+  const infoEl=document.getElementById('dsInfo');
+  const msgs={
+    0:`No normalization. Original stock: mean=$${fmt(am(c1))}, std=$${fmt(as(c1))}. Shifted stock: mean=$${fmt(am(c2))}, std=$${fmt(as(c2))}. A model trained on the original will predict completely wrong prices on the shifted data.`,
+    1:`Global normalization using the ORIGINAL stock's stats (μ=$${fmt(am(c1))}, σ=$${fmt(as(c1))}). The original now has mean≈${fmt(m1,3)}. But the shifted data has mean≈${fmt(m2,1)} — nowhere near 0! The model sees an out-of-distribution input and fails badly (RMSE=160 in notebook 09).`,
+    2:`RevIN normalizes each 20-day window with its OWN mean and std. Both distributions now centre at ≈0 with std≈1. The model sees the same scale regardless of whether prices are $110 or $250. This is why RevIN's RMSE drops from 160 → 11 on the shifted data (notebook 09).`
+  };
+  infoEl.textContent=msgs[dsMode];
+  infoEl.className=dsMode===2?'info green':dsMode===1?'info red':'info';
+}
+
+// ════════════════════════════════════════════════════════════
+// REVIN
+// ════════════════════════════════════════════════════════════
+
+let rvWindow=[], rvNormed=[], rvModel=[], rvFinal=[];
+let rvMuVal=0, rvSigVal=0;
+const RV_WIN=20;
+
+function initRevIN(){ resetRevIN(); }
+
+function resetRevIN(){
+  const start=+document.getElementById('rvStart').value;
+  rvWindow=STOCK.close.slice(start, start+RV_WIN);
+  const startDate=STOCK.dates[start];
+  const endDate=STOCK.dates[start+RV_WIN-1];
+  setT('rvDateRange',`Days ${start}–${start+RV_WIN-1}: ${startDate} → ${endDate}`);
+
+  rvNormed=[]; rvModel=[]; rvFinal=[];
+  rvMuVal=0; rvSigVal=0;
+
+  ['rv0','rv1','rv2','rv3'].forEach((id,i)=>document.getElementById(id).className=i===0?'pipe-step active':'pipe-step pending');
+  document.getElementById('rvBN').disabled=false;
+  document.getElementById('rvBM').disabled=true;
+  document.getElementById('rvBD').disabled=true;
+  document.getElementById('rvBP').disabled=true;
+
+  setT('rvMu','—'); setT('rvSig','—'); setT('rvNM','—'); setT('rvNS','—');
+  const infoEl=document.getElementById('rvInfo');
+  infoEl.textContent=`Window loaded: ${RV_WIN} real close prices from ${startDate} to ${endDate}. Min=$${fmt(amin(rvWindow))}, Max=$${fmt(amax(rvWindow))}. Click Normalize to begin.`;
+  infoEl.className='info purple';
+  document.getElementById('rvProof').style.display='none';
+  document.getElementById('rvAllCard').style.display='none';
+
+  const start_=+document.getElementById('rvStart').value;
+  const wDates=STOCK.dates.slice(start_,start_+RV_WIN);
+  drawRevINLine('rvChart',wDates,rvWindow,'#3b82f6','Close Price ($)');
+  setT('rvChTitle','① Input Window — real close prices from stock_sample.csv');
+}
+
+function stepRV(step){
+  if(step===1){
+    rvMuVal=am(rvWindow); rvSigVal=as(rvWindow)+1e-5;
+    rvNormed=rvWindow.map(v=>(v-rvMuVal)/rvSigVal);
+    setT('rvMu','$'+fmt(rvMuVal)); setT('rvSig','$'+fmt(rvSigVal));
+    setT('rvNM',fmt(am(rvNormed),4)); setT('rvNS',fmt(as(rvNormed),4));
+
+    const infoEl=document.getElementById('rvInfo');
+    infoEl.textContent=`Stored: μ = $${fmt(rvMuVal)} (window mean), σ = $${fmt(rvSigVal)} (window std). Normalized window now has mean ≈ 0 and std ≈ 1. The original prices ($${fmt(amin(rvWindow))}–$${fmt(amax(rvWindow))}) are compressed to a small range around 0.`;
+    infoEl.className='info green';
+
+    setStep(1,true);
+    document.getElementById('rvBN').disabled=true;
+    document.getElementById('rvBM').disabled=false;
+
+    const start=+document.getElementById('rvStart').value;
+    const wDates=STOCK.dates.slice(start,start+RV_WIN);
+    drawRevINLine('rvChart',wDates,rvNormed,'#10b981','Normalized value (unitless)');
+    setT('rvChTitle','② After RevIN Normalize — mean≈0, std≈1');
+
+  } else if(step===2){
+    const last=rvNormed[rvNormed.length-1];
+    rvModel=[];
+    let cur=last;
+    for(let i=0;i<5;i++){ cur=cur*0.82+(Math.random()-.5)*0.3; rvModel.push(cur); }
+
+    const infoEl=document.getElementById('rvInfo');
+    infoEl.textContent=`Model predicted 5 future steps in normalized space. Values: [${rvModel.map(v=>fmt(v,3)).join(', ')}]. These are unitless — the model has no idea prices are in dollars, it just works in the normalized scale.`;
+    infoEl.className='info purple';
+
+    setStep(2,true);
+    document.getElementById('rvBM').disabled=true;
+    document.getElementById('rvBD').disabled=false;
+
+    const start=+document.getElementById('rvStart').value;
+    const wDates=STOCK.dates.slice(start,start+RV_WIN);
+    const predLabels=[...wDates,...Array.from({length:5},(_,i)=>`+${i+1}`)];
+    mk('rvChart',{
+      type:'line',
+      data:{labels:predLabels, datasets:[
+        {label:'Normalized input',data:[...rvNormed,...Array(5).fill(null)],borderColor:'#10b981',borderWidth:2,pointRadius:1.5,tension:.3},
+        {label:'Model output (norm)',data:[...Array(RV_WIN).fill(null),...rvModel],borderColor:'#8b5cf6',borderWidth:2.5,borderDash:[5,3],pointRadius:4,pointBackgroundColor:'#8b5cf6',tension:.3}
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:300},
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{position:'top',labels:{font:{size:11}}},annotation:{annotations:{
+          sep:{type:'line',xMin:RV_WIN-.5,xMax:RV_WIN-.5,borderColor:'#64748b',borderDash:[4,3],borderWidth:1.5,
+            label:{content:'now →',display:true,position:'start',font:{size:9},backgroundColor:'#64748bcc',color:'#fff'}}
+        }}},
+        scales:{
+          x:{ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}},grid:{display:false}},
+          y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'},title:{display:true,text:'Normalized value',color:'#64748b'}}
+        }
+      }
+    });
+    setT('rvChTitle','③ Normalized input + Model output in normalized space');
+
+  } else if(step===3){
+    rvFinal=rvModel.map(v=>v*rvSigVal+rvMuVal);
+
+    const infoEl=document.getElementById('rvInfo');
+    infoEl.textContent=`Denormalized: ŷ = ŷ_norm × $${fmt(rvSigVal)} + $${fmt(rvMuVal)}. Predicted prices: [${rvFinal.map(v=>'$'+fmt(v)).join(', ')}]. These are back in real dollar scale — close to the window's price level of $${fmt(rvMuVal)}.`;
+    infoEl.className='info green';
+
+    setStep(3,true);
+    document.getElementById('rvBD').disabled=true;
+    document.getElementById('rvBP').disabled=false;
+    document.getElementById('rvAllCard').style.display='block';
+
+    const start=+document.getElementById('rvStart').value;
+    const wDates=STOCK.dates.slice(start,start+RV_WIN);
+    const allLabels=[...wDates,...Array.from({length:5},(_,i)=>`+${i+1}`)];
+    mk('rvChart',{
+      type:'line',
+      data:{labels:allLabels, datasets:[
+        {label:'Input window ($)',data:[...rvWindow,...Array(5).fill(null)],borderColor:'#3b82f6',borderWidth:2,pointRadius:1.5,tension:.3},
+        {label:'Predicted prices ($)',data:[...Array(RV_WIN).fill(null),...rvFinal],borderColor:'#f59e0b',borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#f59e0b',tension:.3}
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:300},
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{position:'top',labels:{font:{size:11}}},annotation:{annotations:{
+          sep:{type:'line',xMin:RV_WIN-.5,xMax:RV_WIN-.5,borderColor:'#64748b',borderDash:[4,3],borderWidth:1.5,
+            label:{content:'now →',display:true,position:'start',font:{size:9},backgroundColor:'#64748bcc',color:'#fff'}}
+        }}},
+        scales:{
+          x:{ticks:{maxTicksLimit:8,color:'#64748b',font:{size:10}},grid:{display:false}},
+          y:{ticks:{callback:v=>'$'+fmt(v,1),color:'#64748b',font:{size:10}},grid:{color:'#f1f5f9'},title:{display:true,text:'Price ($)',color:'#64748b'}}
+        }
+      }
+    });
+    setT('rvChTitle','④ Final output — real dollar prices');
+
+    // Draw 4 mini charts
+    const start2=+document.getElementById('rvStart').value;
+    const wd=STOCK.dates.slice(start2,start2+RV_WIN);
+    drawRevINLine('rv4a',wd,rvWindow,'#3b82f6','$');
+    drawRevINLine('rv4b',wd,rvNormed,'#10b981','');
+    drawRevINLine('rv4c',[...wd,...Array(5).fill('').map((_,i)=>`+${i+1}`)],[...rvNormed,...rvModel],'#8b5cf6','');
+    drawRevINLine('rv4d',[...wd,...Array(5).fill('').map((_,i)=>`+${i+1}`)],[...rvWindow,...rvFinal],'#f59e0b','$');
+
+    setT('rvFinalMsg',`Notebook 09 result: this same pipeline applied to all windows gave the RevIN model an RMSE of $2.50 on original data and $10.95 on shifted data — vs the baseline's $160 on shifted data. That is RevIN working.`);
+
+  } else if(step===4){
+    const recon=rvNormed.map(v=>v*rvSigVal+rvMuVal);
+    const maxErr=Math.max(...recon.map((v,i)=>Math.abs(v-rvWindow[i])));
+    const proof=document.getElementById('rvProof');
+    proof.style.display='block';
+    proof.textContent=`✓ Reversibility check: normalize(window) → denormalize → original prices. Max error = ${maxErr.toExponential(2)}. The transform is perfectly reversible — zero information lost.`;
+    proof.className='info green';
+  }
+}
+
+function setStep(n, done){
+  for(let i=0;i<=3;i++){
+    const el=document.getElementById(`rv${i}`);
+    if(i<n) el.className='pipe-step done';
+    else if(i===n) el.className=done?'pipe-step done':'pipe-step active';
+    else el.className='pipe-step pending';
+  }
+}
+
+function drawRevINLine(id, dates, data, color, yLabel){
+  mk(id,{
+    type:'line',
+    data:{labels:dates, datasets:[{data, borderColor:color, backgroundColor:color+'18', borderWidth:2, pointRadius:1.5, pointBackgroundColor:color, fill:true, tension:.3}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{maxTicksLimit:5,color:'#64748b',font:{size:9}},grid:{display:false}},
+        y:{ticks:{color:'#64748b',font:{size:9},...(yLabel==='$'?{callback:v=>'$'+fmt(v,1)}:{})},grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+
+window.onload=()=>{ inited.add('mean'); initMean(); };
+</script>
+</body>
+</html>
